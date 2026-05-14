@@ -4,6 +4,13 @@
 
 BookingPro áp dụng **4 Design Patterns** tại tầng Business Logic, mỗi pattern được chọn với lý do cụ thể, giải quyết vấn đề thực tế trong hệ thống.
 
+| # | Pattern | File chính | Nguyên tắc SOLID |
+|---|---------|-----------|-----------------|
+| 1 | **Strategy** | `patterns/strategy/` | Open/Closed Principle |
+| 2 | **State** | `patterns/state/` | Single Responsibility Principle |
+| 3 | **Observer** | `patterns/observer/` | Single Responsibility Principle |
+| 4 | **Repository** | `repositories/` | Dependency Inversion Principle |
+
 ---
 
 ## 1. Strategy Pattern — Phương thức Thanh toán
@@ -32,113 +39,123 @@ function processPayment(method, amount) {
 ```mermaid
 classDiagram
     class PaymentStrategy {
-        <<interface>>
-        +processPayment(paymentData) PaymentResult
-        +verifyPayment(callbackData) boolean
-        +refund(paymentId, amount) RefundResult
+        <<abstract>>
+        +processPayment(orderData) PaymentResult
+        +verifyPayment(params) boolean
     }
 
     class VNPayStrategy {
         -tmnCode: string
         -secretKey: string
-        +processPayment(paymentData) PaymentResult
-        +verifyPayment(callbackData) boolean
-        +refund(paymentId, amount) RefundResult
-        -createSignature(data) string
+        -vnpUrl: string
+        -returnUrl: string
+        +processPayment(orderData) PaymentResult
+        +verifyPayment(vnpParams) boolean
+        -_sortObject(obj) Object
+        -_formatDate(date) string
     }
 
     class CODStrategy {
-        +processPayment(paymentData) PaymentResult
-        +verifyPayment(callbackData) boolean
-        +refund(paymentId, amount) RefundResult
+        +processPayment(orderData) PaymentResult
+        +verifyPayment(params) boolean
     }
 
     class PaymentContext {
         -strategy: PaymentStrategy
+        +constructor(strategy)
         +setStrategy(strategy) void
-        +executePayment(paymentData) PaymentResult
-        +executeVerify(callbackData) boolean
-        +executeRefund(paymentId, amount) RefundResult
+        +executePayment(orderData) PaymentResult
+        +executeVerify(params) boolean
     }
 
-    PaymentStrategy <|.. VNPayStrategy
-    PaymentStrategy <|.. CODStrategy
-    PaymentContext --> PaymentStrategy
+    PaymentStrategy <|-- VNPayStrategy
+    PaymentStrategy <|-- CODStrategy
+    PaymentContext --> PaymentStrategy : uses
 ```
 
-### 💻 Code minh họa
+### 💻 Code thực tế trong project
 
+**Interface — `payment.strategy.js`:**
 ```javascript
-// strategies/paymentStrategy.js — Interface
 class PaymentStrategy {
-  async processPayment(paymentData) {
-    throw new Error('Phải implement processPayment()');
+  async processPayment(orderData) {
+    throw new Error('Method processPayment() must be implemented');
   }
-  async verifyPayment(callbackData) {
-    throw new Error('Phải implement verifyPayment()');
-  }
-  async refund(paymentId, amount) {
-    throw new Error('Phải implement refund()');
+
+  async verifyPayment(params) {
+    throw new Error('Method verifyPayment() must be implemented');
   }
 }
+```
 
-// strategies/vnpayStrategy.js
+**VNPAY — `vnpay.strategy.js`:**
+```javascript
 class VNPayStrategy extends PaymentStrategy {
   constructor() {
     super();
-    this.tmnCode = process.env.VNPAY_TMN_CODE;
-    this.secretKey = process.env.VNPAY_SECRET_KEY;
+    this.tmnCode = process.env.VNP_TMNCODE;
+    this.secretKey = process.env.VNP_HASHSECRET;
+    this.vnpUrl = process.env.VNP_URL;
+    this.returnUrl = process.env.VNP_RETURNURL;
   }
 
-  async processPayment({ orderId, amount, returnUrl }) {
-    // Tạo URL thanh toán VNPAY với HMAC signature
-    const vnpUrl = this._buildPaymentUrl(orderId, amount, returnUrl);
-    return { paymentUrl: vnpUrl, method: 'vnpay' };
+  async processPayment({ orderId, amount, orderInfo, ipAddress }) {
+    // Tạo params VNPAY v2.1.0
+    // Sắp xếp params → Tạo HMAC SHA512 signature → Build URL
+    return { paymentUrl: finalUrl, method: 'vnpay' };
   }
 
-  async verifyPayment(callbackData) {
+  async verifyPayment(vnp_Params) {
     // Xác thực signature từ VNPAY callback
-    return this._verifySignature(callbackData);
-  }
-
-  async refund(paymentId, amount) {
-    // Gọi VNPAY Refund API
-    return { success: true, refundAmount: amount };
+    // So sánh HMAC SHA512 + kiểm tra vnp_ResponseCode === '00'
+    return secureHash === signed && vnp_Params['vnp_ResponseCode'] === '00';
   }
 }
+```
 
-// strategies/codStrategy.js
+**COD — `cod.strategy.js`:**
+```javascript
 class CODStrategy extends PaymentStrategy {
-  async processPayment({ orderId, amount }) {
-    // COD không cần URL, chỉ tạo record
-    return { method: 'cod', status: 'pending' };
+  async processPayment(orderData) {
+    return {
+      method: 'cod',
+      status: 'pending',
+      message: 'Đặt lịch thành công. Vui lòng thanh toán tại quầy.'
+    };
   }
 
-  async verifyPayment() {
-    return true; // COD xác nhận thủ công
-  }
-
-  async refund(paymentId, amount) {
-    return { success: true, refundAmount: amount, note: 'Hoàn tiền mặt' };
+  async verifyPayment(params) {
+    return true; // COD xác nhận thủ công bởi nhân viên
   }
 }
+```
 
-// context/paymentContext.js
+**Context — `payment.context.js`:**
+```javascript
 class PaymentContext {
+  constructor(strategy) {
+    this.strategy = strategy;
+  }
+
   setStrategy(strategy) {
     this.strategy = strategy;
   }
 
-  async executePayment(paymentData) {
-    return this.strategy.processPayment(paymentData);
+  async executePayment(orderData) {
+    return await this.strategy.processPayment(orderData);
+  }
+
+  async executeVerify(params) {
+    return await this.strategy.verifyPayment(params);
   }
 }
+```
 
-// Sử dụng trong PaymentService
+**Sử dụng trong PaymentService:**
+```javascript
 const strategies = { vnpay: new VNPayStrategy(), cod: new CODStrategy() };
-const context = new PaymentContext();
-context.setStrategy(strategies[method]); // method = 'vnpay' | 'cod'
-const result = await context.executePayment(paymentData);
+const context = new PaymentContext(strategies[method]);
+const result = await context.executePayment(orderData);
 ```
 
 ### 🤔 Nếu không dùng Strategy?
@@ -152,7 +169,7 @@ const result = await context.executePayment(paymentData);
 
 ### 📌 Vấn đề cần giải quyết
 
-Booking có 4 trạng thái: `pending`, `confirmed`, `completed`, `cancelled`. Mỗi trạng thái có hành vi khác nhau và quy tắc chuyển đổi nghiêm ngặt:
+Booking có 5 trạng thái: `draft`, `pending`, `confirmed`, `completed`, `cancelled`. Mỗi trạng thái có hành vi khác nhau và quy tắc chuyển đổi nghiêm ngặt:
 
 ```javascript
 // ❌ KHÔNG NÊN — if-else lồng nhau khó quản lý
@@ -172,115 +189,177 @@ function handleAction(booking, action) {
 ```mermaid
 classDiagram
     class BookingState {
-        <<interface>>
-        +confirm(booking) void
-        +cancel(booking) void
-        +complete(booking) void
+        <<abstract>>
+        #bookingContext: BookingContext
+        +constructor(bookingContext)
+        +confirm() void
+        +cancel() void
+        +complete() void
+        +getStatus() string
+    }
+
+    class DraftState {
+        +confirm() void
+        +cancel() void
         +getStatus() string
     }
 
     class PendingState {
-        +confirm(booking) void
-        +cancel(booking) void
-        +complete(booking) void
+        +confirm() void
+        +cancel() void
         +getStatus() string
     }
 
     class ConfirmedState {
-        +confirm(booking) void
-        +cancel(booking) void
-        +complete(booking) void
+        +complete() void
+        +cancel() void
         +getStatus() string
     }
 
     class CompletedState {
-        +confirm(booking) void
-        +cancel(booking) void
-        +complete(booking) void
         +getStatus() string
     }
 
     class CancelledState {
-        +confirm(booking) void
-        +cancel(booking) void
-        +complete(booking) void
         +getStatus() string
     }
 
     class BookingContext {
+        -bookingRecord: Object
+        -bookingRepo: BookingRepository
         -state: BookingState
-        +setState(state) void
+        +constructor(bookingRecord, bookingRepo)
+        -_initStateMachine() void
+        +updateStatus(newStatus) void
         +confirm() void
         +cancel() void
         +complete() void
+        +getCurrentStatus() string
     }
 
-    BookingState <|.. PendingState
-    BookingState <|.. ConfirmedState
-    BookingState <|.. CompletedState
-    BookingState <|.. CancelledState
-    BookingContext --> BookingState
+    BookingState <|-- DraftState
+    BookingState <|-- PendingState
+    BookingState <|-- ConfirmedState
+    BookingState <|-- CompletedState
+    BookingState <|-- CancelledState
+    BookingContext --> BookingState : current state
 ```
 
-### 💻 Code minh họa
+### State Transition Diagram
 
+```mermaid
+stateDiagram-v2
+    [*] --> draft
+    draft --> confirmed : confirm()
+    draft --> cancelled : cancel()
+    pending --> confirmed : confirm()
+    pending --> cancelled : cancel()
+    confirmed --> completed : complete()
+    confirmed --> cancelled : cancel()
+    completed --> [*]
+    cancelled --> [*]
+```
+
+### 💻 Code thực tế trong project
+
+**Abstract State — `booking.state.js`:**
 ```javascript
-// states/bookingState.js
 class BookingState {
-  confirm(context) { throw new Error('Hành động không hợp lệ'); }
-  cancel(context) { throw new Error('Hành động không hợp lệ'); }
-  complete(context) { throw new Error('Hành động không hợp lệ'); }
+  constructor(bookingContext) {
+    this.bookingContext = bookingContext;
+  }
+
+  async confirm() {
+    throw new Error('Hành động này không hợp lệ cho trạng thái hiện tại');
+  }
+
+  async complete() {
+    throw new Error('Hành động này không hợp lệ cho trạng thái hiện tại');
+  }
+
+  async cancel() {
+    throw new Error('Hành động này không hợp lệ cho trạng thái hiện tại');
+  }
+
+  getStatus() {
+    throw new Error('Method getStatus() must be implemented');
+  }
 }
+```
 
-// states/pendingState.js
+**Concrete States — `booking.states.js`:**
+```javascript
 class PendingState extends BookingState {
-  confirm(context) {
-    console.log('Booking chuyển từ PENDING → CONFIRMED');
-    context.setState(new ConfirmedState());
+  async confirm() {
+    await this.bookingContext.updateStatus('confirmed');
   }
-
-  cancel(context) {
-    console.log('Booking chuyển từ PENDING → CANCELLED');
-    context.setState(new CancelledState());
+  async cancel() {
+    await this.bookingContext.updateStatus('cancelled');
   }
-
-  // complete() → throw Error (không thể complete khi chưa confirm)
   getStatus() { return 'pending'; }
 }
 
-// states/confirmedState.js
 class ConfirmedState extends BookingState {
-  complete(context) {
-    console.log('Booking chuyển từ CONFIRMED → COMPLETED');
-    context.setState(new CompletedState());
+  async complete() {
+    await this.bookingContext.updateStatus('completed');
   }
-
-  cancel(context) {
-    console.log('Booking chuyển từ CONFIRMED → CANCELLED');
-    context.setState(new CancelledState());
+  async cancel() {
+    await this.bookingContext.updateStatus('cancelled');
   }
-
-  // confirm() → throw Error (đã confirm rồi)
   getStatus() { return 'confirmed'; }
 }
 
-// BookingContext
+class CompletedState extends BookingState {
+  // Trạng thái cuối, không cho phép thao tác gì thêm
+  getStatus() { return 'completed'; }
+}
+
+class CancelledState extends BookingState {
+  // Trạng thái cuối, không cho phép thao tác gì thêm
+  getStatus() { return 'cancelled'; }
+}
+
+class DraftState extends BookingState {
+  async confirm() {
+    await this.bookingContext.updateStatus('confirmed');
+  }
+  async cancel() {
+    await this.bookingContext.updateStatus('cancelled');
+  }
+  getStatus() { return 'draft'; }
+}
+```
+
+**Context — `booking.context.js`:**
+```javascript
 class BookingContext {
-  constructor(initialStatus) {
-    const stateMap = {
-      pending: new PendingState(),
-      confirmed: new ConfirmedState(),
-      completed: new CompletedState(),
-      cancelled: new CancelledState(),
-    };
-    this.state = stateMap[initialStatus];
+  constructor(bookingRecord, bookingRepo) {
+    this.bookingRecord = bookingRecord;
+    this.bookingRepo = bookingRepo;
+    this._initStateMachine();
   }
 
-  setState(state) { this.state = state; }
-  confirm() { this.state.confirm(this); }
-  cancel() { this.state.cancel(this); }
-  complete() { this.state.complete(this); }
-  getStatus() { return this.state.getStatus(); }
+  _initStateMachine() {
+    const states = {
+      'draft': new DraftState(this),
+      'pending': new PendingState(this),
+      'confirmed': new ConfirmedState(this),
+      'completed': new CompletedState(this),
+      'cancelled': new CancelledState(this)
+    };
+    this.state = states[this.bookingRecord.status];
+  }
+
+  async updateStatus(newStatus) {
+    await this.bookingRepo.updateStatus(this.bookingRecord.id, newStatus);
+    this.bookingRecord.status = newStatus;
+    this._initStateMachine(); // Refresh state object
+  }
+
+  async confirm() { return await this.state.confirm(); }
+  async cancel() { return await this.state.cancel(); }
+  async complete() { return await this.state.complete(); }
+  getCurrentStatus() { return this.state.getStatus(); }
 }
 ```
 
@@ -291,15 +370,14 @@ class BookingContext {
 
 ---
 
-## 3. Observer Pattern — Hệ thống Notification
+## 3. Observer Pattern — Hệ thống Notification & Logging
 
 ### 📌 Vấn đề cần giải quyết
 
-Khi trạng thái booking thay đổi, cần thông báo đến nhiều bên:
-- Thông báo cho khách hàng
-- Thông báo cho nhân viên
-- Lưu log hệ thống
-- (Tương lai) Gửi email, SMS
+Khi trạng thái booking thay đổi, cần thực hiện nhiều tác vụ phụ:
+- Tạo thông báo (notification) trong DB cho khách/nhân viên
+- Ghi log hệ thống
+- (Tương lai) Gửi email, SMS, push notification
 
 Nếu viết trực tiếp trong BookingService:
 
@@ -309,8 +387,7 @@ async confirmBooking(id) {
   // ... logic confirm
   await notificationRepo.create({ userId: customerId, ... });
   await notificationRepo.create({ userId: staffId, ... });
-  await emailService.send(customerEmail, ...);
-  await smsService.send(customerPhone, ...);
+  console.log(`[LOG] Booking ${id} confirmed...`);
   // BookingService đang làm quá nhiều việc!
 }
 ```
@@ -319,112 +396,156 @@ async confirmBooking(id) {
 
 ```mermaid
 classDiagram
-    class EventEmitter {
-        -listeners: Map
-        +on(event, listener) void
-        +emit(event, data) void
-        +off(event, listener) void
+    class Subject {
+        -observers: Observer[]
+        +attach(observer) void
+        +detach(observer) void
+        +notify(event, data) void
     }
 
-    class BookingObserver {
-        <<interface>>
-        +update(eventType, data) void
+    class Observer {
+        <<abstract>>
+        +update(event, data) void
     }
 
     class NotificationObserver {
-        +update(eventType, data) void
+        +update(event, data) void
     }
 
-    class LogObserver {
-        +update(eventType, data) void
+    class LoggingObserver {
+        +update(event, data) void
     }
 
-    EventEmitter --> BookingObserver
-    BookingObserver <|.. NotificationObserver
-    BookingObserver <|.. LogObserver
+    Subject --> Observer : notifies
+    Observer <|-- NotificationObserver
+    Observer <|-- LoggingObserver
 ```
 
-### 💻 Code minh họa
+### 💻 Code thực tế trong project
 
+**Subject — `subject.js`:**
 ```javascript
-// observer/eventEmitter.js
-class BookingEventEmitter {
+class Subject {
   constructor() {
-    this.listeners = new Map();
+    this.observers = [];
   }
 
-  on(event, listener) {
-    if (!this.listeners.has(event)) {
-      this.listeners.set(event, []);
+  attach(observer) {
+    this.observers.push(observer);
+  }
+
+  detach(observer) {
+    this.observers = this.observers.filter(obs => obs !== observer);
+  }
+
+  async notify(event, data) {
+    for (const observer of this.observers) {
+      await observer.update(event, data);
     }
-    this.listeners.get(event).push(listener);
-  }
-
-  emit(event, data) {
-    const eventListeners = this.listeners.get(event) || [];
-    eventListeners.forEach(listener => listener.update(event, data));
   }
 }
+```
 
-// observer/notificationObserver.js
-class NotificationObserver {
-  constructor(notificationRepository) {
-    this.notificationRepo = notificationRepository;
+**Observer Interface — `observer.js`:**
+```javascript
+class Observer {
+  async update(event, data) {
+    throw new Error('Method update() must be implemented');
   }
+}
+```
 
-  async update(eventType, { booking, customer, staff }) {
-    const messages = {
-      'booking:confirmed': {
-        title: 'Lịch hẹn đã được xác nhận',
-        message: `Lịch hẹn #${booking.id} đã được xác nhận`,
+**NotificationObserver — `notification.observer.js`:**
+```javascript
+class NotificationObserver extends Observer {
+  async update(event, data) {
+    const { booking, customer, staff, payment } = data;
+
+    const notificationMap = {
+      'booking_created': {
+        userId: staff.id,
+        title: 'Lịch hẹn mới',
+        message: `Khách hàng ${customer.fullName} vừa đặt dịch vụ #${booking.id}`,
+        type: 'booking_created'
       },
-      'booking:cancelled': {
+      'booking_confirmed': {
+        userId: customer.id,
+        title: 'Lịch hẹn được xác nhận',
+        message: `Lịch hẹn #${booking.id} đã được nhân viên ${staff.fullName} xác nhận`,
+        type: 'booking_confirmed'
+      },
+      'payment_success': {
+        userId: customer?.id,
+        title: 'Thanh toán thành công',
+        message: `Thanh toán cho booking #${booking?.id} đã thành công`,
+        type: 'payment_success'
+      },
+      'booking_cancelled': {
+        userId: staff.id,
         title: 'Lịch hẹn đã bị hủy',
-        message: `Lịch hẹn #${booking.id} đã bị hủy`,
-      },
-      'booking:completed': {
-        title: 'Dịch vụ hoàn thành',
-        message: `Lịch hẹn #${booking.id} đã hoàn thành`,
-      },
+        message: `Khách hàng ${customer.fullName} đã hủy lịch hẹn #${booking.id}`,
+        type: 'booking_cancelled'
+      }
     };
 
-    const msg = messages[eventType];
-    if (!msg) return;
-
-    // Thông báo cho khách hàng
-    await this.notificationRepo.create({
-      userId: customer.id,
-      bookingId: booking.id,
-      ...msg,
-      type: eventType.replace('booking:', 'booking_'),
-    });
-
-    // Thông báo cho nhân viên
-    await this.notificationRepo.create({
-      userId: staff.id,
-      bookingId: booking.id,
-      ...msg,
-      type: eventType.replace('booking:', 'booking_'),
-    });
+    const config = notificationMap[event];
+    if (config) {
+      await notificationRepository.create({ ...config, bookingId: booking.id });
+    }
   }
 }
+```
 
-// Đăng ký observer trong app.js
-const emitter = new BookingEventEmitter();
-emitter.on('booking:confirmed', new NotificationObserver(notifRepo));
-emitter.on('booking:cancelled', new NotificationObserver(notifRepo));
-emitter.on('booking:completed', new NotificationObserver(notifRepo));
+**LoggingObserver — `logging.observer.js`:**
+```javascript
+class LoggingObserver extends Observer {
+  async update(event, data) {
+    const { booking, customer, staff, refundAmount, refundPercentage, payment } = data;
 
-// BookingService chỉ cần emit event
+    const eventLogs = {
+      'booking_created': { event: 'BOOKING_CREATED', ... },
+      'booking_confirmed': { event: 'BOOKING_CONFIRMED', ... },
+      'booking_completed': { event: 'BOOKING_COMPLETED', ... },
+      'booking_cancelled': { event: 'BOOKING_CANCELLED', ... },
+      'booking_refunded': { event: 'BOOKING_REFUNDED', ... },
+      'payment_success': { event: 'PAYMENT_SUCCESS', ... }
+    };
+
+    const logEntry = eventLogs[event];
+    if (logEntry) {
+      console.log(`📋 [${logEntry.timestamp}] ${logEntry.event} — ${logEntry.details}`);
+    }
+  }
+}
+```
+
+**Đăng ký observer trong service:**
+```javascript
+const bookingSubject = new Subject();
+bookingSubject.attach(new NotificationObserver());
+bookingSubject.attach(new LoggingObserver());
+
+// BookingService chỉ cần notify
 async confirmBooking(id) {
   // ... logic confirm
-  this.emitter.emit('booking:confirmed', { booking, customer, staff });
+  await bookingSubject.notify('booking_confirmed', { booking, customer, staff });
   // Sạch sẽ, không cần biết ai đang lắng nghe
 }
 ```
 
+### Events được hỗ trợ
+
+| Event | Trigger | NotificationObserver | LoggingObserver |
+|-------|---------|---------------------|-----------------|
+| `booking_created` | Tạo booking mới | ✅ Thông báo staff | ✅ Log |
+| `booking_confirmed` | Xác nhận booking | ✅ Thông báo customer | ✅ Log |
+| `booking_completed` | Hoàn thành dịch vụ | | ✅ Log |
+| `booking_cancelled` | Hủy booking | ✅ Thông báo staff | ✅ Log |
+| `booking_refunded` | Hoàn tiền | | ✅ Log |
+| `payment_success` | Thanh toán thành công | ✅ Thông báo customer | ✅ Log |
+
 ### 🤔 Nếu không dùng Observer?
-- BookingService bị coupling chặt với NotificationService, EmailService, SMSService
+- BookingService bị coupling chặt với NotificationRepository, LoggingService
 - Thêm kênh thông báo mới → sửa BookingService → vi phạm **Single Responsibility**
 - Khó test BookingService vì phụ thuộc nhiều service khác
 
@@ -457,39 +578,60 @@ class BookingService {
 classDiagram
     class BaseRepository {
         #model: Model
+        +constructor(model)
         +findAll(options) Array
-        +findById(id) Object
+        +findById(id, options) Object
         +create(data) Object
         +update(id, data) Object
         +delete(id) boolean
     }
 
-    class BookingRepository {
-        +findByCustomer(customerId) Array
-        +findByStaffAndDate(staffId, date) Array
-        +findConflictingSlots(staffId, date, startTime, endTime) Array
-        +updateStatus(id, status) Object
+    class UserRepository {
+        +findByEmail(email) User
+        +findStaffByService(serviceId) User[]
     }
 
-    class UserRepository {
-        +findByEmail(email) Object
-        +findStaffByService(serviceId) Array
+    class ServiceRepository {
+        +findByCategoryId(categoryId) Service[]
+        +findActiveServices() Service[]
+    }
+
+    class StaffScheduleRepository {
+        +findByStaffId(staffId) StaffSchedule[]
+        +findByStaffAndDay(staffId, dayOfWeek) StaffSchedule[]
+    }
+
+    class BookingRepository {
+        +findByCustomer(customerId) Booking[]
+        +findByStaffAndDate(staffId, date) Booking[]
+        +findConflictingSlots(staffId, date, start, end) Booking[]
+        +updateStatus(id, status) Booking
+        +findPendingExpired() Booking[]
     }
 
     class PaymentRepository {
-        +findByBookingId(bookingId) Object
-        +updatePaymentStatus(id, status) Object
+        +findByBookingId(bookingId) Payment
+        +updatePaymentStatus(id, status) Payment
     }
 
-    BaseRepository <|-- BookingRepository
+    class NotificationRepository {
+        +findByUser(userId) Notification[]
+        +markAsRead(id) Notification
+        +markAllAsRead(userId) void
+    }
+
     BaseRepository <|-- UserRepository
+    BaseRepository <|-- ServiceRepository
+    BaseRepository <|-- StaffScheduleRepository
+    BaseRepository <|-- BookingRepository
     BaseRepository <|-- PaymentRepository
+    BaseRepository <|-- NotificationRepository
 ```
 
-### 💻 Code minh họa
+### 💻 Code thực tế trong project
 
+**BaseRepository — `base.repository.js`:**
 ```javascript
-// repositories/base.repository.js
 class BaseRepository {
   constructor(model) {
     this.model = model;
@@ -520,28 +662,20 @@ class BaseRepository {
     return true;
   }
 }
+```
 
-// repositories/booking.repository.js
+**BookingRepository — `booking.repository.js` (ví dụ):**
+```javascript
 class BookingRepository extends BaseRepository {
-  constructor(bookingModel, serviceModel, userModel) {
-    super(bookingModel);
-    this.serviceModel = serviceModel;
-    this.userModel = userModel;
-  }
-
   async findByCustomer(customerId) {
     return this.model.findAll({
       where: { customerId },
-      include: [
-        { model: this.serviceModel },
-        { model: this.userModel, as: 'staff', attributes: ['id', 'fullName'] },
-      ],
+      include: [/* Service, Staff */],
       order: [['createdAt', 'DESC']],
     });
   }
 
   async findConflictingSlots(staffId, bookingDate, startTime, endTime) {
-    const { Op } = require('sequelize');
     return this.model.findAll({
       where: {
         staffId,
@@ -555,8 +689,10 @@ class BookingRepository extends BaseRepository {
     });
   }
 }
+```
 
-// Service sạch sẽ, không biết chi tiết query
+**Service sạch sẽ, không biết chi tiết query:**
+```javascript
 class BookingService {
   constructor(bookingRepository) {
     this.bookingRepo = bookingRepository;
@@ -577,9 +713,44 @@ class BookingService {
 
 ## 📊 Tổng kết
 
-| Pattern | Nguyên tắc SOLID | Vấn đề giải quyết |
-|---------|-----------------|-------------------|
-| Strategy | Open/Closed | Mở rộng phương thức thanh toán |
-| State | Single Responsibility | Quản lý trạng thái booking |
-| Observer | Single Responsibility | Tách biệt notification logic |
-| Repository | Dependency Inversion | Tách biệt data access logic |
+| Pattern | Nguyên tắc SOLID | Vấn đề giải quyết | File trong project |
+|---------|-----------------|-------------------|-------------------|
+| Strategy | Open/Closed | Mở rộng phương thức thanh toán | `patterns/strategy/` |
+| State | Single Responsibility | Quản lý trạng thái booking (5 states) | `patterns/state/` |
+| Observer | Single Responsibility | Tách biệt notification + logging logic | `patterns/observer/` |
+| Repository | Dependency Inversion | Tách biệt data access logic | `repositories/` |
+
+### Sơ đồ tổng hợp: Design Patterns trong luồng Booking
+
+```mermaid
+sequenceDiagram
+    participant Customer
+    participant BookingService
+    participant StatePattern as State Pattern
+    participant ObserverPattern as Observer Pattern
+    participant StrategyPattern as Strategy Pattern
+    participant Database
+
+    Customer->>BookingService: Đặt lịch
+    BookingService->>Database: Tạo booking (pending)
+    BookingService->>ObserverPattern: notify("booking_created")
+    ObserverPattern->>Database: Tạo notification cho staff
+    ObserverPattern->>ObserverPattern: Ghi log
+
+    Customer->>BookingService: Thanh toán VNPAY
+    BookingService->>StrategyPattern: VNPayStrategy.processPayment()
+    StrategyPattern-->>Customer: paymentUrl (redirect)
+
+    Note over Customer: VNPAY Callback
+
+    BookingService->>StrategyPattern: VNPayStrategy.verifyPayment()
+    BookingService->>StatePattern: BookingContext.confirm()
+    StatePattern->>Database: Update status = confirmed
+    BookingService->>ObserverPattern: notify("booking_confirmed")
+
+    Note over Customer: Sau khi phục vụ xong
+
+    BookingService->>StatePattern: BookingContext.complete()
+    StatePattern->>Database: Update status = completed
+    BookingService->>ObserverPattern: notify("booking_completed")
+```

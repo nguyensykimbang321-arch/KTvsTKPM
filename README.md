@@ -25,13 +25,13 @@ Dự án được thiết kế theo kiến trúc **3-Tier** kết hợp mô hìn
 ```
 ┌──────────────────────────────────┐
 │     PRESENTATION TIER            │
-│     React Native Mobile App      │
+│     React Native (Expo SDK 54)   │
 │     (Screens, Components, UI)    │
 └──────────────┬───────────────────┘
                │ REST API (HTTP/JSON)
 ┌──────────────▼───────────────────┐
 │     BUSINESS LOGIC TIER          │
-│     Node.js + Express            │
+│     Node.js + Express.js         │
 │     (Controllers, Services,      │
 │      Patterns, Middlewares)      │
 └──────────────┬───────────────────┘
@@ -46,9 +46,9 @@ Dự án được thiết kế theo kiến trúc **3-Tier** kết hợp mô hìn
 ### MVC Pattern (Backend)
 
 ```
-Request → Route → Controller → Service → Repository → Model → Database
-                      ↓
-                  Response (JSON)
+Request → Route → Middleware (Auth/Role) → Controller → Service → Repository → Model → Database
+                                              ↓
+                                          Response (JSON)
 ```
 
 ---
@@ -57,10 +57,10 @@ Request → Route → Controller → Service → Repository → Model → Databa
 
 | # | Pattern | Áp dụng | Lý do |
 |---|---------|---------|-------|
-| 1 | **Strategy** | Phương thức thanh toán | Dễ mở rộng thêm cổng thanh toán mới mà không sửa code cũ (Open/Closed) |
-| 2 | **State** | Trạng thái Booking | Quản lý chuyển trạng thái hợp lệ, tránh if-else phức tạp |
-| 3 | **Observer** | Hệ thống Notification | Tách biệt logic thông báo khỏi nghiệp vụ chính |
-| 4 | **Repository** | Tầng truy xuất dữ liệu | Tách query khỏi business logic, dễ thay đổi DB |
+| 1 | **Strategy** | Phương thức thanh toán (VNPAY, COD) | Dễ mở rộng thêm cổng thanh toán mới mà không sửa code cũ (Open/Closed Principle) |
+| 2 | **State** | Trạng thái Booking (pending → confirmed → completed / cancelled) | Quản lý chuyển trạng thái hợp lệ, loại bỏ if-else phức tạp |
+| 3 | **Observer** | Hệ thống Notification & Logging | Tách biệt logic thông báo/ghi log khỏi nghiệp vụ chính (Single Responsibility) |
+| 4 | **Repository** | Tầng truy xuất dữ liệu | Tách query khỏi business logic, dễ thay đổi DB (Dependency Inversion) |
 
 ---
 
@@ -68,10 +68,11 @@ Request → Route → Controller → Service → Repository → Model → Databa
 
 | Actor | Mô tả |
 |-------|-------|
-| **Khách hàng (Customer)** | Đăng ký, đặt lịch, thanh toán, xem lịch sử, hủy lịch |
-| **Nhân viên (Staff)** | Xem lịch làm việc, xác nhận/hoàn thành booking |
-| **Quản trị viên (Admin)** | Quản lý dịch vụ, nhân viên, báo cáo doanh thu |
-| **Hệ thống VNPAY** | Xử lý giao dịch thanh toán online |
+| **Khách hàng (Customer)** | Đăng ký, đặt lịch, thanh toán, xem lịch sử, hủy lịch, xem thông báo |
+| **Nhân viên (Staff)** | Xem lịch làm việc, xác nhận/hoàn thành booking, xem thông báo |
+| **Quản trị viên (Admin)** | Quản lý danh mục, dịch vụ, nhân viên, lịch nhân viên, báo cáo doanh thu |
+| **Hệ thống VNPAY** | Xử lý giao dịch thanh toán online, callback xác nhận |
+| **Hệ thống (Cron Job)** | Tự động nhắc nhở & hủy booking quá hạn |
 
 ---
 
@@ -79,12 +80,15 @@ Request → Route → Controller → Service → Repository → Model → Databa
 
 | Thành phần | Công nghệ |
 |------------|-----------|
-| Frontend | React Native |
+| Frontend | React Native + Expo SDK 54 |
+| UI/Font | Inter, Outfit (Google Fonts), Lucide Icons |
+| Navigation | React Navigation 7 (Native Stack + Bottom Tabs) |
 | Backend | Node.js + Express.js |
 | Database | MySQL |
-| ORM | Sequelize |
-| Authentication | JWT (JSON Web Token) |
+| ORM | Sequelize 6 |
+| Authentication | JWT (JSON Web Token) + Bcrypt.js |
 | Payment Gateway | VNPAY |
+| Scheduler | node-cron |
 | API Format | RESTful JSON |
 
 ---
@@ -92,44 +96,107 @@ Request → Route → Controller → Service → Repository → Model → Databa
 ## 📁 Cấu trúc thư mục
 
 ```
-t7/
+KTvsTKPM/
 ├── README.md
-├── docs/                          # Tài liệu thiết kế
-│   ├── architecture.md            # Kiến trúc hệ thống
-│   ├── database-design.md         # Thiết kế CSDL
-│   ├── design-patterns.md         # Design Patterns
-│   └── uml/                       # Các UML Diagrams
-│       ├── use-case.md
-│       ├── class-diagram.md
-│       ├── sequence-diagram.md
-│       └── component-diagram.md
+├── docs/                              # Tài liệu thiết kế
+│   ├── architecture.md                # Kiến trúc hệ thống
+│   ├── database-design.md             # Thiết kế CSDL
+│   ├── design-patterns.md             # Design Patterns chi tiết
+│   └── uml/                           # Các UML Diagrams
+│       ├── use-case.md                # Use Case Diagram
+│       ├── class-diagram.md           # Class Diagram
+│       ├── sequence-diagram.md        # Sequence Diagram
+│       └── component-diagram.md       # Component Diagram
 │
-├── backend/                       # Backend API
+├── backend/                           # Backend API
 │   ├── package.json
-│   ├── .env.example
+│   ├── .env                           # Biến môi trường
 │   └── src/
-│       ├── app.js                 # Entry point
-│       ├── config/                # Cấu hình (DB, env)
-│       ├── models/                # Sequelize Models
-│       ├── repositories/          # Repository Pattern
-│       ├── services/              # Business Logic
-│       ├── controllers/           # Request handlers
-│       ├── routes/                # API Routes
-│       ├── middlewares/           # Auth, Error handling
-│       ├── patterns/              # Design Patterns
-│       │   ├── strategy/          # Payment Strategy
-│       │   ├── state/             # Booking State Machine
-│       │   └── observer/          # Notification Observer
-│       └── utils/                 # Helpers, validators
+│       ├── app.js                     # Entry point, middleware, cron jobs
+│       ├── config/
+│       │   └── database.js            # Sequelize connection config
+│       ├── models/                    # Sequelize Models
+│       │   ├── index.js               # Model loader + associations
+│       │   ├── user.model.js
+│       │   ├── category.model.js
+│       │   ├── service.model.js
+│       │   ├── staffSchedule.model.js
+│       │   ├── booking.model.js
+│       │   ├── payment.model.js
+│       │   └── notification.model.js
+│       ├── repositories/              # Repository Pattern
+│       │   ├── base.repository.js     # Base CRUD operations
+│       │   ├── user.repository.js
+│       │   ├── service.repository.js
+│       │   ├── staffSchedule.repository.js
+│       │   ├── booking.repository.js
+│       │   ├── payment.repository.js
+│       │   └── notification.repository.js
+│       ├── services/                  # Business Logic
+│       │   ├── auth.service.js
+│       │   ├── booking.service.js
+│       │   ├── payment.service.js
+│       │   └── reminder.service.js    # Cron job: nhắc nhở & tự động hủy
+│       ├── controllers/               # Request handlers
+│       │   ├── auth.controller.js
+│       │   ├── booking.controller.js
+│       │   ├── category.controller.js
+│       │   ├── service.controller.js
+│       │   ├── staff.controller.js
+│       │   └── payment.controller.js
+│       ├── routes/
+│       │   └── api.routes.js          # Tập trung tất cả route definitions
+│       ├── middlewares/
+│       │   └── index.js               # Auth JWT + Role-based access
+│       └── patterns/                  # Design Patterns
+│           ├── strategy/              # Payment Strategy Pattern
+│           │   ├── payment.strategy.js    # Interface (abstract class)
+│           │   ├── payment.context.js     # Context
+│           │   ├── vnpay.strategy.js      # VNPAY implementation
+│           │   └── cod.strategy.js        # COD implementation
+│           ├── state/                 # Booking State Pattern
+│           │   ├── booking.state.js       # Interface (abstract class)
+│           │   ├── booking.context.js     # Context
+│           │   └── booking.states.js      # Concrete states (Pending, Confirmed, Completed, Cancelled)
+│           └── observer/              # Notification Observer Pattern
+│               ├── subject.js             # Subject (EventEmitter)
+│               ├── observer.js            # Observer interface
+│               ├── notification.observer.js # Notification concrete observer
+│               └── logging.observer.js    # Logging concrete observer
 │
-└── frontend/                      # React Native App
+└── frontend/                          # React Native (Expo) App
     ├── package.json
+    ├── app.json                       # Expo config
+    ├── App.js                         # Root component (font loading, navigation)
+    ├── index.js                       # Entry point
     └── src/
-        ├── screens/               # Màn hình
-        ├── components/            # Components tái sử dụng
-        ├── services/              # API calls
-        ├── navigation/            # React Navigation
-        └── utils/                 # Helpers
+        ├── theme/
+        │   └── theme.js               # Design tokens (colors, spacing, typography)
+        ├── components/
+        │   ├── Common.js              # Shared UI components
+        │   └── BottomNav.js           # Bottom navigation bar
+        ├── navigation/
+        │   ├── AppNavigator.js        # Root navigator (Auth vs Main)
+        │   └── MainTabNavigator.js    # Bottom tab navigator
+        ├── screens/
+        │   ├── LoginScreen.js         # Đăng nhập
+        │   ├── RegisterScreen.js      # Đăng ký
+        │   ├── HomeScreen.js          # Trang chủ — danh sách dịch vụ
+        │   ├── ExploreScreen.js       # Khám phá dịch vụ
+        │   ├── BookingScreen.js       # Đặt lịch hẹn
+        │   ├── PaymentScreen.js       # Chọn phương thức thanh toán
+        │   ├── VNPayScreen.js         # WebView trang thanh toán VNPAY
+        │   ├── HistoryScreen.js       # Lịch sử đặt lịch
+        │   ├── NotificationScreen.js  # Thông báo
+        │   ├── ProfileScreen.js       # Hồ sơ cá nhân
+        │   ├── StaffDashboardScreen.js    # Dashboard nhân viên
+        │   ├── AdminDashboardScreen.js    # Dashboard quản trị
+        │   ├── ManageCategoriesScreen.js  # Quản lý danh mục
+        │   ├── ManageServicesScreen.js    # Quản lý dịch vụ
+        │   ├── ManageStaffScreen.js       # Quản lý nhân viên
+        │   └── RevenueScreen.js           # Báo cáo doanh thu
+        └── services/
+            └── api.js                 # Axios instance + API endpoints
 ```
 
 ---
@@ -162,23 +229,30 @@ Khi khách đặt lịch, hệ thống kiểm tra:
    └───────────┘
 ```
 
-### 3. Quy tắc hủy lịch
-- Hủy trước **24 giờ** → Hoàn tiền 100%
-- Hủy trước **12 giờ** → Hoàn tiền 50%
-- Hủy sau **12 giờ** → Không hoàn tiền
+### 3. Quy tắc hủy lịch & hoàn tiền
+- Hủy trước **≥ 1 tiếng** so với giờ hẹn → Hoàn tiền 100%
+- Hủy trong vòng **< 1 tiếng** trước giờ hẹn → Hoàn tiền 50%
+- Hủy **sau giờ hẹn** (quá giờ) → Không hoàn tiền
 
-### 4. Thanh toán VNPAY
-Luồng: Tạo đơn → Tạo URL VNPAY → Redirect → Callback → Cập nhật trạng thái
+### 4. Thanh toán VNPAY (Strategy Pattern)
+Luồng: Tạo booking → Chọn phương thức → VNPayStrategy tạo URL → WebView redirect → Callback → Verify signature → Cập nhật trạng thái
+
+### 5. Cron Job — Tự động nhắc nhở & hủy booking
+- **Reminder Service** chạy theo lịch (node-cron), tự động hủy các booking `pending` đã quá hạn thời gian đặt lịch
 
 ---
 
 ## 🚀 Cài đặt & Chạy
 
+### Yêu cầu
+- Node.js >= 18
+- MySQL >= 8.0
+- Expo CLI (`npm install -g expo-cli`)
+
 ### Backend
 ```bash
 cd backend
 npm install
-cp .env.example .env
 # Cấu hình database trong .env
 npm run dev
 ```
@@ -188,16 +262,19 @@ npm run dev
 cd frontend
 npm install
 npm start
+# Quét QR code bằng Expo Go app trên điện thoại
 ```
 
 ---
 
 ## 📚 Tài liệu thiết kế
 
-- [Kiến trúc hệ thống](docs/architecture.md)
-- [Thiết kế Database](docs/database-design.md)
-- [Design Patterns](docs/design-patterns.md)
-- [Use Case Diagram](docs/uml/use-case.md)
-- [Class Diagram](docs/uml/class-diagram.md)
-- [Sequence Diagram](docs/uml/sequence-diagram.md)
-- [Component Diagram](docs/uml/component-diagram.md)
+| Tài liệu | Mô tả |
+|-----------|--------|
+| [Kiến trúc hệ thống](docs/architecture.md) | 3-Tier Architecture, MVC, luồng xử lý request |
+| [Thiết kế Database](docs/database-design.md) | ERD, chi tiết bảng, SQL schema, seed data |
+| [Design Patterns](docs/design-patterns.md) | Strategy, State, Observer, Repository — code minh họa |
+| [Use Case Diagram](docs/uml/use-case.md) | Sơ đồ UC tổng thể + mô tả chi tiết |
+| [Class Diagram](docs/uml/class-diagram.md) | Class diagram toàn hệ thống |
+| [Sequence Diagram](docs/uml/sequence-diagram.md) | Các luồng nghiệp vụ chính |
+| [Component Diagram](docs/uml/component-diagram.md) | Kiến trúc component |

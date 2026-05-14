@@ -20,25 +20,30 @@ BookingPro sử dụng kiến trúc **3-Tier (3 tầng)** kết hợp mô hình 
 ```mermaid
 graph TB
     subgraph "PRESENTATION TIER"
-        A[React Native App]
+        A["React Native App (Expo SDK 54)"]
         A1[Screens]
         A2[Components]
         A3[Navigation]
+        A4["Theme / Design Tokens"]
         A --> A1
         A --> A2
         A --> A3
+        A --> A4
     end
 
     subgraph "BUSINESS LOGIC TIER"
         B[Express.js Server]
-        B1[Routes]
+        B1[API Routes]
         B2[Controllers]
         B3[Services]
         B4[Middlewares]
         B5["Patterns (Strategy, State, Observer)"]
+        B6["Cron Jobs (Reminder)"]
         B --> B1 --> B2 --> B3
         B --> B4
         B3 --> B5
+        B --> B6
+        B6 --> B3
     end
 
     subgraph "DATA TIER"
@@ -63,71 +68,87 @@ graph TB
 
 ## 3. Chi tiết từng Tầng
 
-### 3.1 Presentation Tier (React Native)
+### 3.1 Presentation Tier (React Native + Expo)
 
 **Vai trò:** Hiển thị giao diện, thu thập input từ người dùng, gửi request đến Backend.
 
 ```
 frontend/src/
-├── screens/           # Các màn hình chính
-│   ├── auth/          # Login, Register
-│   ├── home/          # Trang chủ, danh sách dịch vụ
-│   ├── booking/       # Đặt lịch, chọn slot
-│   ├── payment/       # Thanh toán
-│   ├── history/       # Lịch sử đặt lịch
-│   └── admin/         # Quản lý (admin)
-├── components/        # Component tái sử dụng
-│   ├── Button.js
-│   ├── Card.js
-│   └── Modal.js
-├── services/          # Gọi API
-│   └── api.js         # Axios instance + endpoints
-├── navigation/        # React Navigation config
-└── utils/             # Helpers (format date, price...)
+├── theme/
+│   └── theme.js               # Design tokens: colors, spacing, typography, shadows
+├── components/
+│   ├── Common.js               # Shared UI: Button, Card, Input, Badge...
+│   └── BottomNav.js            # Bottom navigation bar
+├── navigation/
+│   ├── AppNavigator.js         # Root navigator (Auth flow vs Main flow)
+│   └── MainTabNavigator.js     # Bottom tab navigator (Home, History, Notification, Profile)
+├── screens/
+│   ├── LoginScreen.js          # Đăng nhập
+│   ├── RegisterScreen.js       # Đăng ký
+│   ├── HomeScreen.js           # Trang chủ — danh sách dịch vụ theo danh mục
+│   ├── ExploreScreen.js        # Khám phá dịch vụ
+│   ├── BookingScreen.js        # Đặt lịch: chọn nhân viên, ngày, slot
+│   ├── PaymentScreen.js        # Chọn phương thức thanh toán
+│   ├── VNPayScreen.js          # WebView hiển thị trang VNPAY
+│   ├── HistoryScreen.js        # Lịch sử đặt lịch + hủy booking
+│   ├── NotificationScreen.js   # Danh sách thông báo
+│   ├── ProfileScreen.js        # Hồ sơ cá nhân
+│   ├── StaffDashboardScreen.js     # Dashboard nhân viên
+│   ├── AdminDashboardScreen.js     # Dashboard quản trị viên
+│   ├── ManageCategoriesScreen.js   # CRUD danh mục dịch vụ
+│   ├── ManageServicesScreen.js     # CRUD dịch vụ
+│   ├── ManageStaffScreen.js        # Quản lý nhân viên + lịch làm việc
+│   └── RevenueScreen.js            # Báo cáo doanh thu
+└── services/
+    └── api.js                  # Axios instance + tất cả API endpoints
 ```
 
 **Nguyên tắc:**
 - KHÔNG chứa business logic
 - Chỉ gọi API và hiển thị dữ liệu
 - Validate form cơ bản (trống, format email)
+- Design tokens tập trung trong `theme.js`
 
 ### 3.2 Business Logic Tier (Node.js + Express)
 
-**Vai trò:** Xử lý toàn bộ nghiệp vụ, áp dụng design patterns, quản lý authentication.
+**Vai trò:** Xử lý toàn bộ nghiệp vụ, áp dụng design patterns, quản lý authentication, chạy cron jobs.
 
 ```
 backend/src/
-├── app.js              # Express setup, middleware registration
+├── app.js                     # Express setup, middleware, route, cron jobs registration
 ├── config/
-│   └── database.js     # Sequelize connection config
-├── routes/             # Định nghĩa endpoints
-│   ├── auth.routes.js
-│   ├── service.routes.js
-│   ├── booking.routes.js
-│   ├── payment.routes.js
-│   └── notification.routes.js
-├── controllers/        # Nhận request, gọi service, trả response
-│   ├── auth.controller.js
-│   ├── service.controller.js
-│   ├── booking.controller.js
-│   ├── payment.controller.js
-│   └── notification.controller.js
-├── services/           # Business logic
-│   ├── auth.service.js
-│   ├── booking.service.js
-│   ├── payment.service.js
-│   └── notification.service.js
+│   └── database.js            # Sequelize connection config (đọc từ .env)
+├── routes/
+│   └── api.routes.js          # Tập trung tất cả route definitions
+├── controllers/
+│   ├── auth.controller.js     # Register, Login
+│   ├── booking.controller.js  # CRUD booking + confirm/complete/cancel
+│   ├── category.controller.js # CRUD danh mục
+│   ├── service.controller.js  # CRUD dịch vụ
+│   ├── staff.controller.js    # Quản lý nhân viên + lịch làm việc
+│   └── payment.controller.js  # Tạo thanh toán, VNPAY callback
+├── services/
+│   ├── auth.service.js        # Xác thực, hash password, generate JWT
+│   ├── booking.service.js     # Nghiệp vụ đặt lịch, kiểm tra slot, chuyển trạng thái
+│   ├── payment.service.js     # Nghiệp vụ thanh toán (dùng Strategy Pattern)
+│   └── reminder.service.js    # Cron job: tự động hủy booking quá hạn
 ├── middlewares/
-│   ├── auth.middleware.js      # JWT verification
-│   ├── role.middleware.js      # Role-based access
-│   └── errorHandler.js        # Centralized error handling
+│   └── index.js               # JWT verification + Role-based access control
 ├── patterns/
-│   ├── strategy/               # Payment Strategy Pattern
-│   ├── state/                  # Booking State Pattern
-│   └── observer/               # Notification Observer Pattern
-└── utils/
-    ├── validators.js           # Input validation
-    └── helpers.js              # Date, format helpers
+│   ├── strategy/              # Payment Strategy Pattern
+│   │   ├── payment.strategy.js    # Abstract class
+│   │   ├── payment.context.js     # Context (chọn strategy)
+│   │   ├── vnpay.strategy.js      # VNPAY implementation
+│   │   └── cod.strategy.js        # COD implementation
+│   ├── state/                 # Booking State Pattern
+│   │   ├── booking.state.js       # Abstract class
+│   │   ├── booking.context.js     # Context (quản lý state)
+│   │   └── booking.states.js      # PendingState, ConfirmedState, CompletedState, CancelledState
+│   └── observer/              # Notification Observer Pattern
+│       ├── subject.js             # Subject (EventEmitter)
+│       ├── observer.js            # Observer interface
+│       ├── notification.observer.js   # Gửi thông báo DB
+│       └── logging.observer.js        # Ghi log hệ thống
 ```
 
 **Luồng xử lý Request (MVC):**
@@ -135,19 +156,21 @@ backend/src/
 ```mermaid
 sequenceDiagram
     participant Client
-    participant Middleware
-    participant Route
+    participant Route as api.routes.js
+    participant MW as Middleware (Auth/Role)
     participant Controller
     participant Service
+    participant Pattern as Design Patterns
     participant Repository
     participant Database
 
     Client->>Route: HTTP Request
-    Route->>Middleware: Auth check
-    Middleware->>Controller: Authorized
+    Route->>MW: Auth check + Role check
+    MW->>Controller: Authorized
     Controller->>Service: Business logic
+    Service->>Pattern: Apply pattern (Strategy/State/Observer)
     Service->>Repository: Data access
-    Repository->>Database: Query
+    Repository->>Database: Sequelize Query
     Database-->>Repository: Result
     Repository-->>Service: Data
     Service-->>Controller: Processed result
@@ -159,23 +182,26 @@ sequenceDiagram
 **Vai trò:** Lưu trữ dữ liệu, đảm bảo tính toàn vẹn, cung cấp truy vấn hiệu quả.
 
 ```
-├── models/             # Sequelize Model definitions
-│   ├── index.js        # Model loader + associations
-│   ├── user.model.js
-│   ├── service.model.js
-│   ├── staffSchedule.model.js
-│   ├── booking.model.js
-│   ├── payment.model.js
-│   └── notification.model.js
-├── repositories/       # Repository Pattern
-│   ├── base.repository.js      # Base CRUD operations
-│   ├── user.repository.js
-│   ├── booking.repository.js
-│   ├── payment.repository.js
-│   └── notification.repository.js
+├── models/                    # Sequelize Model definitions
+│   ├── index.js               # Model loader + associations
+│   ├── user.model.js          # Users (customer, staff, admin)
+│   ├── category.model.js      # Danh mục dịch vụ
+│   ├── service.model.js       # Dịch vụ
+│   ├── staffSchedule.model.js # Lịch làm việc nhân viên
+│   ├── booking.model.js       # Đặt lịch
+│   ├── payment.model.js       # Thanh toán
+│   └── notification.model.js  # Thông báo
+├── repositories/              # Repository Pattern
+│   ├── base.repository.js         # Base CRUD operations
+│   ├── user.repository.js         # User queries
+│   ├── service.repository.js      # Service queries
+│   ├── staffSchedule.repository.js # StaffSchedule queries
+│   ├── booking.repository.js      # Booking queries (slot conflict, filter)
+│   ├── payment.repository.js      # Payment queries
+│   └── notification.repository.js # Notification queries
 ```
 
-**Tại sao dùng Repository Pattern?**
+**Tại sao dùng Repository Pattern ở đây?**
 - Tách biệt query logic khỏi business logic
 - Service không cần biết dùng MySQL hay MongoDB
 - Dễ viết unit test (mock repository)
@@ -188,26 +214,50 @@ sequenceDiagram
 |-----------|------------|--------|
 | Frontend → Backend | HTTP REST API | JSON |
 | Backend → Database | Sequelize ORM | SQL queries |
-| Backend → VNPAY | HTTPS POST/GET | Query string + HMAC |
+| Backend → VNPAY | HTTPS POST/GET | Query string + HMAC SHA512 |
 | VNPAY → Backend | HTTPS Callback | Query string |
 
 ### API Convention
 
 ```
-Base URL: http://localhost:3000/api/v1
+Base URL: http://localhost:3000/api
 
-GET    /services              → Danh sách dịch vụ
-GET    /services/:id          → Chi tiết dịch vụ
-POST   /auth/register         → Đăng ký
-POST   /auth/login            → Đăng nhập
-POST   /bookings              → Tạo booking
-GET    /bookings/:id          → Chi tiết booking
-PATCH  /bookings/:id/confirm  → Xác nhận booking (staff)
-PATCH  /bookings/:id/complete → Hoàn thành booking (staff)
-PATCH  /bookings/:id/cancel   → Hủy booking
-POST   /payments/create-vnpay → Tạo URL thanh toán VNPAY
-GET    /payments/vnpay-return  → Callback từ VNPAY
-GET    /notifications         → Danh sách thông báo
+Authentication:
+  POST   /api/auth/register          → Đăng ký
+  POST   /api/auth/login             → Đăng nhập
+
+Categories:
+  GET    /api/categories              → Danh sách danh mục
+  POST   /api/categories              → Tạo danh mục (admin)
+  PUT    /api/categories/:id          → Cập nhật danh mục (admin)
+  DELETE /api/categories/:id          → Xóa danh mục (admin)
+
+Services:
+  GET    /api/services                → Danh sách dịch vụ
+  POST   /api/services                → Tạo dịch vụ (admin)
+  PUT    /api/services/:id            → Cập nhật dịch vụ (admin)
+  DELETE /api/services/:id            → Xóa dịch vụ (admin)
+
+Bookings:
+  POST   /api/bookings                → Tạo booking
+  GET    /api/bookings/my             → Booking của tôi (customer)
+  GET    /api/bookings/:id            → Chi tiết booking
+  PATCH  /api/bookings/:id/confirm    → Xác nhận booking (staff/admin)
+  PATCH  /api/bookings/:id/complete   → Hoàn thành booking (staff/admin)
+  PATCH  /api/bookings/:id/cancel     → Hủy booking
+
+Payments:
+  POST   /api/payments/create-vnpay   → Tạo URL thanh toán VNPAY
+  GET    /api/payments/vnpay-return   → Callback từ VNPAY
+
+Staff Management:
+  GET    /api/staff                   → Danh sách nhân viên
+  GET    /api/staff/:id/schedules     → Lịch làm việc nhân viên
+  POST   /api/staff/:id/schedules     → Tạo lịch làm việc (admin)
+
+Notifications:
+  GET    /api/notifications           → Danh sách thông báo
+  PATCH  /api/notifications/:id/read  → Đánh dấu đã đọc
 ```
 
 ---
@@ -216,10 +266,10 @@ GET    /notifications         → Danh sách thông báo
 
 | Lớp bảo mật | Cơ chế |
 |-------------|--------|
-| Authentication | JWT Token (access + refresh) |
+| Authentication | JWT Token (access token) |
 | Authorization | Role-based middleware (customer, staff, admin) |
 | Data Validation | Middleware validate input trước khi xử lý |
-| Password | Bcrypt hashing |
+| Password | Bcrypt.js hashing |
 | VNPAY | HMAC SHA512 signature verification |
 | Environment | `.env` file cho sensitive config |
 

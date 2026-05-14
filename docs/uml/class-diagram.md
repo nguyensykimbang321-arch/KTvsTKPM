@@ -17,6 +17,17 @@ classDiagram
         -datetime updatedAt
         +getBookings() Booking[]
         +getNotifications() Notification[]
+        +getSchedules() StaffSchedule[]
+    }
+
+    class Category {
+        -int id
+        -string name
+        -string description
+        -boolean isActive
+        -datetime createdAt
+        -datetime updatedAt
+        +getServices() Service[]
     }
 
     class Service {
@@ -26,7 +37,11 @@ classDiagram
         -decimal price
         -int durationMinutes
         -string imageUrl
+        -int categoryId
         -boolean isActive
+        -datetime createdAt
+        -datetime updatedAt
+        +getCategory() Category
         +getStaffSchedules() StaffSchedule[]
     }
 
@@ -55,6 +70,8 @@ classDiagram
         -decimal totalAmount
         -datetime cancelledAt
         -string cancelReason
+        -datetime createdAt
+        -datetime updatedAt
         +getCustomer() User
         +getStaff() User
         +getService() Service
@@ -83,11 +100,13 @@ classDiagram
         -string message
         -enum type
         -boolean isRead
+        -datetime createdAt
         +getUser() User
         +getBooking() Booking
     }
 
-    %% ===== RELATIONSHIPS =====
+    %% ===== MODEL RELATIONSHIPS =====
+    Category "1" --> "*" Service : contains
     User "1" --> "*" Booking : creates
     User "1" --> "*" Booking : serves
     User "1" --> "*" StaffSchedule : has
@@ -107,16 +126,28 @@ classDiagram
         +delete(id) boolean
     }
 
+    class UserRepository {
+        +findByEmail(email) User
+        +findStaffByService(serviceId) User[]
+    }
+
+    class ServiceRepository {
+        +findByCategoryId(categoryId) Service[]
+        +findActiveServices() Service[]
+    }
+
+    class StaffScheduleRepository {
+        +findByStaffId(staffId) StaffSchedule[]
+        +findByStaffAndDay(staffId, dayOfWeek) StaffSchedule[]
+        +findByServiceId(serviceId) StaffSchedule[]
+    }
+
     class BookingRepository {
         +findByCustomer(customerId) Booking[]
         +findByStaffAndDate(staffId, date) Booking[]
         +findConflictingSlots(staffId, date, start, end) Booking[]
         +updateStatus(id, status) Booking
-    }
-
-    class UserRepository {
-        +findByEmail(email) User
-        +findStaffByService(serviceId) User[]
+        +findPendingExpired() Booking[]
     }
 
     class PaymentRepository {
@@ -130,8 +161,10 @@ classDiagram
         +markAllAsRead(userId) void
     }
 
-    BaseRepository <|-- BookingRepository
     BaseRepository <|-- UserRepository
+    BaseRepository <|-- ServiceRepository
+    BaseRepository <|-- StaffScheduleRepository
+    BaseRepository <|-- BookingRepository
     BaseRepository <|-- PaymentRepository
     BaseRepository <|-- NotificationRepository
 
@@ -149,7 +182,7 @@ classDiagram
         -bookingRepo: BookingRepository
         -scheduleRepo: StaffScheduleRepository
         -stateContext: BookingContext
-        -eventEmitter: BookingEventEmitter
+        -eventEmitter: BookingSubject
         +createBooking(data) Booking
         +confirmBooking(id) Booking
         +completeBooking(id) Booking
@@ -167,21 +200,20 @@ classDiagram
         +processRefund(paymentId, amount) RefundResult
     }
 
-    class NotificationService {
-        -notifRepo: NotificationRepository
-        +getUserNotifications(userId) Notification[]
-        +markAsRead(id) Notification
-        +markAllAsRead(userId) void
+    class ReminderService {
+        -bookingRepo: BookingRepository
+        +cancelExpiredBookings() void
     }
 
     %% ===== Service Dependencies =====
     AuthService --> UserRepository
     BookingService --> BookingRepository
+    BookingService --> StaffScheduleRepository
     BookingService --> BookingContext
-    BookingService --> BookingEventEmitter
+    BookingService --> BookingSubject
     PaymentService --> PaymentRepository
     PaymentService --> PaymentContext
-    NotificationService --> NotificationRepository
+    ReminderService --> BookingRepository
 
     %% ===== STRATEGY PATTERN =====
     class PaymentStrategy {
@@ -272,11 +304,11 @@ classDiagram
     BookingContext --> BookingState
 
     %% ===== OBSERVER PATTERN =====
-    class BookingEventEmitter {
-        -listeners: Map
-        +on(event, listener) void
-        +emit(event, data) void
-        +off(event, listener) void
+    class BookingSubject {
+        -observers: Map
+        +subscribe(event, observer) void
+        +unsubscribe(event, observer) void
+        +notify(event, data) void
     }
 
     class BookingObserver {
@@ -289,13 +321,13 @@ classDiagram
         +update(eventType, data) void
     }
 
-    class LogObserver {
+    class LoggingObserver {
         +update(eventType, data) void
     }
 
     BookingObserver <|.. NotificationObserver
-    BookingObserver <|.. LogObserver
-    BookingEventEmitter --> BookingObserver
+    BookingObserver <|.. LoggingObserver
+    BookingSubject --> BookingObserver
 
     %% ===== CONTROLLERS =====
     class AuthController {
@@ -312,6 +344,26 @@ classDiagram
         +confirm(req, res) void
         +complete(req, res) void
         +cancel(req, res) void
+    }
+
+    class CategoryController {
+        +getAll(req, res) void
+        +create(req, res) void
+        +update(req, res) void
+        +delete(req, res) void
+    }
+
+    class ServiceController {
+        +getAll(req, res) void
+        +create(req, res) void
+        +update(req, res) void
+        +delete(req, res) void
+    }
+
+    class StaffController {
+        +getStaffList(req, res) void
+        +getStaffSchedules(req, res) void
+        +createSchedule(req, res) void
     }
 
     class PaymentController {
@@ -332,18 +384,21 @@ classDiagram
 ### Models
 | Quan hệ | Kiểu | Ý nghĩa |
 |---------|------|---------|
-| User → Booking | 1:N | Khách tạo nhiều booking |
+| Category → Service | 1:N | Một danh mục chứa nhiều dịch vụ |
+| User → Booking (customer) | 1:N | Khách tạo nhiều booking |
 | User → Booking (staff) | 1:N | Nhân viên phục vụ nhiều booking |
 | Service → Booking | 1:N | Dịch vụ được đặt nhiều lần |
 | Booking → Payment | 1:1 | Mỗi booking có 1 thanh toán |
 | Booking → Notification | 1:N | Mỗi booking sinh nhiều thông báo |
+| User → StaffSchedule | 1:N | Nhân viên có nhiều lịch làm việc |
+| Service → StaffSchedule | 1:N | Dịch vụ có nhiều nhân viên cung cấp |
 
 ### Layers
 | Tầng | Class | Phụ thuộc |
-|------|-------|-----------|
-| Controller | AuthController, BookingController | → Service |
-| Service | BookingService, PaymentService | → Repository + Patterns |
-| Repository | BookingRepository, UserRepository | → Model |
+|------|-------|-----------| 
+| Controller | AuthController, BookingController, CategoryController, ServiceController, StaffController, PaymentController | → Service |
+| Service | AuthService, BookingService, PaymentService, ReminderService | → Repository + Patterns |
+| Repository | UserRepository, ServiceRepository, StaffScheduleRepository, BookingRepository, PaymentRepository, NotificationRepository | → Model (extends BaseRepository) |
 | Patterns | Strategy, State, Observer | Được inject vào Service |
 
 ---
@@ -354,3 +409,4 @@ classDiagram
 2. **Interface Segregation**: Mỗi pattern có interface riêng (PaymentStrategy, BookingState, BookingObserver)
 3. **Single Responsibility**: Controller chỉ nhận/trả request, Service xử lý logic, Repository truy vấn data
 4. **Open/Closed**: Thêm payment method mới = tạo class mới implement PaymentStrategy, không sửa code cũ
+5. **Liskov Substitution**: Mọi concrete state (PendingState, ConfirmedState...) đều thay thế được BookingState interface

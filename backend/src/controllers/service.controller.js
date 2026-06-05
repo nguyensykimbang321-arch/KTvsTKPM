@@ -1,19 +1,9 @@
-const { Service, Category, StaffSchedule, User } = require('../models');
+const serviceService = require('../services/service.service');
 
 class ServiceController {
   async getAll(req, res, next) {
     try {
-      const services = await Service.findAll({
-        where: { isActive: true },
-        include: [
-          { model: Category },
-          { 
-            model: StaffSchedule,
-            as: 'staffSchedules',
-            include: [{ model: User, as: 'staff', attributes: ['id', 'fullName'] }]
-          }
-        ]
-      });
+      const services = await serviceService.getAllActiveServices();
       res.json(services);
     } catch (error) {
       next(error);

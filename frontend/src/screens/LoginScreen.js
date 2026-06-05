@@ -11,7 +11,7 @@ import { PremiumButton, GlassInput } from '../components/Common';
 import { authService } from '../services/api';
 
 export default function LoginScreen({ navigation }) {
-  const [email, setEmail] = useState('staff2@a.com');
+  const [email, setEmail] = useState('customer@a.com');
   const [password, setPassword] = useState('password123');
   const [loading, setLoading] = useState(false);
 

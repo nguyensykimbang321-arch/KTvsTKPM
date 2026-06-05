@@ -1,17 +1,28 @@
-import React from 'react';
-import { StyleSheet, View, TouchableOpacity, Text } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Text, Platform } from 'react-native';
 import { Home, Clock, User } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../theme/theme';
 
 export default function BottomNav({ state, descriptors, navigation }) {
+  const insets = useSafeAreaInsets();
   const tabs = [
     { name: 'Home', icon: Home, label: 'Trang chủ' },
     { name: 'History', icon: Clock, label: 'Lịch sử' },
     { name: 'Profile', icon: User, label: 'Hồ sơ' },
   ];
 
+  // Tính toán khoảng cách đáy an toàn
+  const bottomGap = Platform.select({
+    ios: insets.bottom > 0 ? insets.bottom : 20,
+    android: insets.bottom > 0 ? insets.bottom + 12 : 32, // Tăng thêm trên Android để tránh đè phím điều hướng
+    default: 24
+  });
+
   return (
-    <View style={styles.container}>
+    <View style={[
+      styles.container, 
+      { bottom: bottomGap }
+    ]}>
       <View style={styles.navBar}>
         {tabs.map((tab, index) => {
           const isActive = state.index === index;
@@ -55,7 +66,6 @@ export default function BottomNav({ state, descriptors, navigation }) {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 24,
     left: 20,
     right: 20,
     backgroundColor: 'white',

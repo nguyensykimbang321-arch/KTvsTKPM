@@ -30,11 +30,8 @@ export default function MainTabNavigator() {
 
 const styles = StyleSheet.create({
   tabBarContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 100, // Đảm bảo đủ không gian cho floating nav
     backgroundColor: 'transparent',
+    elevation: 0,
+    borderTopWidth: 0,
   }
 });

@@ -2,7 +2,7 @@ const { Op } = require('sequelize');
 const bookingRepository = require('../repositories/booking.repository');
 const userRepository = require('../repositories/user.repository');
 const serviceRepository = require('../repositories/service.repository');
-const { Payment } = require('../models');
+const paymentRepository = require('../repositories/payment.repository');
 const BookingContext = require('../patterns/state/booking.context');
 const Subject = require('../patterns/observer/subject');
 const NotificationObserver = require('../patterns/observer/notification.observer');
@@ -81,7 +81,7 @@ class BookingService extends Subject {
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) throw new Error('Không tìm thấy lịch hẹn');
 
-    // Chốt chuyển trạng thái qua State Pattern
+    // State Pattern: Chuyển trạng thái an toàn
     const context = new BookingContext(booking, bookingRepository);
     await context.cancel();
 
@@ -150,25 +150,27 @@ class BookingService extends Subject {
     const refundPercentage = this._calculateRefundPercentage(booking.bookingDate, booking.startTime);
     const refundAmount = (booking.totalAmount * refundPercentage) / 100;
 
-    // Cập nhật trạng thái booking → cancelled
+    // State Pattern: Chuyển trạng thái booking → cancelled qua State Machine
+    const context = new BookingContext(booking, bookingRepository);
+    await context.cancel();
+
+    // Cập nhật lý do hủy qua Repository
     await bookingRepository.update(bookingId, { 
-      status: 'cancelled',
       cancelReason: reason,
       cancelledAt: new Date()
     });
 
-    // Cập nhật bảng Payment (nếu đã thanh toán qua VNPay)
-    const payment = await Payment.findOne({ where: { bookingId } });
+    // Repository Pattern: Cập nhật Payment qua PaymentRepository
+    const payment = await paymentRepository.findByBookingId(bookingId);
     if (payment && payment.status === 'success') {
       const paymentUpdate = {
         refundAmount,
         refundedAt: new Date()
       };
-      // Chỉ chuyển status sang 'refunded' nếu có hoàn tiền
       if (refundAmount > 0) {
         paymentUpdate.status = 'refunded';
       }
-      await payment.update(paymentUpdate);
+      await paymentRepository.update(payment.id, paymentUpdate);
     }
 
     booking.status = 'cancelled';

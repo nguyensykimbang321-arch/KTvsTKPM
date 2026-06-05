@@ -5,8 +5,8 @@ const PaymentContext = require('../patterns/strategy/payment.context');
 const VNPayStrategy = require('../patterns/strategy/vnpay.strategy');
 const CODStrategy = require('../patterns/strategy/cod.strategy');
 const Subject = require('../patterns/observer/subject');
+const NotificationObserver = require('../patterns/observer/notification.observer');
 const LoggingObserver = require('../patterns/observer/logging.observer');
-const bookingService = require('./booking.service');
 const BookingContext = require('../patterns/state/booking.context');
 
 class PaymentService extends Subject {
@@ -18,7 +18,8 @@ class PaymentService extends Subject {
     };
     this.context = new PaymentContext();
     
-    // Đăng ký Logging Observer
+    // Đăng ký cả 2 Observer: Notification + Logging
+    this.attach(new NotificationObserver());
     this.attach(new LoggingObserver());
   }
 

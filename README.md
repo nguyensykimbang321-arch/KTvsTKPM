@@ -61,6 +61,7 @@ Request → Route → Middleware (Auth/Role) → Controller → Service → Repo
 | 2 | **State** | Trạng thái Booking (pending → confirmed → completed / cancelled) | Quản lý chuyển trạng thái hợp lệ, loại bỏ if-else phức tạp |
 | 3 | **Observer** | Hệ thống Notification & Logging | Tách biệt logic thông báo/ghi log khỏi nghiệp vụ chính (Single Responsibility) |
 | 4 | **Repository** | Tầng truy xuất dữ liệu | Tách query khỏi business logic, dễ thay đổi DB (Dependency Inversion) |
+| 5 | **Singleton** | Khởi tạo Database Connection (Sequelize), Axios Client, các Services & Repositories | Khởi tạo đối tượng duy nhất một lần để tránh tạo lại lãng phí bộ nhớ, đồng bộ hóa cấu hình (JWT, API URL) và tránh cạn kiệt pool kết nối |
 
 ---
 

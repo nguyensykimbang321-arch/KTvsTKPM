@@ -75,4 +75,10 @@ export const paymentService = {
   initiate: (bookingId, method, amount) => api.post('/payments/initiate', { bookingId, method, amount }),
 };
 
+export const notificationService = {
+  getNotifications: () => api.get('/notifications'),
+  markAllAsRead: () => api.patch('/notifications/read'),
+  deleteAll: () => api.delete('/notifications'),
+};
+
 export default api;

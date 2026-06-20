@@ -59,28 +59,40 @@ export default function StaffDashboardScreen({ navigation }) {
     : bookings.filter(b => b.status === filterStatus);
 
   const handleUpdateStatus = async (bookingId, newStatus) => {
-    Alert.alert(
-      'Xác nhận',
-      `Bạn muốn chuyển trạng thái lịch hẹn sang: ${newStatus === 'completed' ? 'Hoàn thành' : 'Đã hủy'}?`,
-      [
-        { text: 'Quay lại', style: 'cancel' },
-        { 
-          text: 'Đồng ý', 
-          onPress: async () => {
-            try {
-              if (newStatus === 'completed') {
-                await bookingService.complete(bookingId);
-              } else if (newStatus === 'cancelled') {
-                await bookingService.cancel(bookingId, 'Nhân viên hủy lịch');
-              }
-              fetchStaffBookings();
-            } catch (error) {
-              Alert.alert('Lỗi', typeof error === 'string' ? error : 'Không thể cập nhật trạng thái');
-            }
-          }
+    const performUpdate = async () => {
+      try {
+        if (newStatus === 'completed') {
+          await bookingService.complete(bookingId);
+        } else if (newStatus === 'cancelled') {
+          await bookingService.cancel(bookingId, 'Nhân viên hủy lịch');
         }
-      ]
-    );
+        fetchStaffBookings();
+      } catch (error) {
+        if (Platform.OS === 'web') {
+          alert(typeof error === 'string' ? error : 'Không thể cập nhật trạng thái');
+        } else {
+          Alert.alert('Lỗi', typeof error === 'string' ? error : 'Không thể cập nhật trạng thái');
+        }
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (confirm(`Bạn muốn chuyển trạng thái lịch hẹn sang: ${newStatus === 'completed' ? 'Hoàn thành' : 'Đã hủy'}?`)) {
+        await performUpdate();
+      }
+    } else {
+      Alert.alert(
+        'Xác nhận',
+        `Bạn muốn chuyển trạng thái lịch hẹn sang: ${newStatus === 'completed' ? 'Hoàn thành' : 'Đã hủy'}?`,
+        [
+          { text: 'Quay lại', style: 'cancel' },
+          { 
+            text: 'Đồng ý', 
+            onPress: performUpdate
+          }
+        ]
+      );
+    }
   };
 
   const handleConfirmBooking = async (bookingId) => {

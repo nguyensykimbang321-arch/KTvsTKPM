@@ -99,7 +99,7 @@ export default function HomeScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
       <View style={styles.header}>
         <View>
           <Text style={styles.welcome}>Chào buổi sáng 👋</Text>

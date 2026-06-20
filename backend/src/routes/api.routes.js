@@ -3,6 +3,7 @@ const router = express.Router();
 const authController = require('../controllers/auth.controller');
 const bookingController = require('../controllers/booking.controller');
 const paymentController = require('../controllers/payment.controller');
+const notificationController = require('../controllers/notification.controller');
 const { authMiddleware, roleMiddleware, validateRegister, validateLogin } = require('../middlewares');
 
 // Auth Routes
@@ -35,5 +36,10 @@ router.post('/staffs/:staffId/schedules', authMiddleware, roleMiddleware(['staff
 router.patch('/staffs/:staffId/schedules/:scheduleId', authMiddleware, roleMiddleware(['staff', 'admin']), staffController.updateSchedule);
 router.delete('/staffs/:staffId/schedules/:scheduleId', authMiddleware, roleMiddleware(['staff', 'admin']), staffController.deleteSchedule);
 router.get('/categories', categoryController.getAll);
+
+// Notification Routes
+router.get('/notifications', authMiddleware, notificationController.getMyNotifications);
+router.patch('/notifications/read', authMiddleware, notificationController.markAllAsRead);
+router.delete('/notifications', authMiddleware, notificationController.deleteAllNotifications);
 
 module.exports = router;

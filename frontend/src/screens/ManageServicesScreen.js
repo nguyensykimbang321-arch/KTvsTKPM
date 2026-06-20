@@ -69,18 +69,29 @@ export default function ManageServicesScreen({ navigation }) {
   };
 
   const handleDelete = (id) => {
-    Alert.alert('Xác nhận', 'Bạn chắc chắn muốn xóa dịch vụ này?', [
-      { text: 'Hủy', style: 'cancel' },
-      { text: 'Xóa', style: 'destructive', onPress: async () => {
-          try {
-            await bookingService.deleteService(id);
-            fetchServices();
-          } catch (error) {
-            Alert.alert('Lỗi', 'Không thể xóa dịch vụ');
-          }
+    const performDelete = async () => {
+      try {
+        await bookingService.deleteService(id);
+        fetchServices();
+      } catch (error) {
+        if (Platform.OS === 'web') {
+          alert('Không thể xóa dịch vụ');
+        } else {
+          Alert.alert('Lỗi', 'Không thể xóa dịch vụ');
         }
       }
-    ]);
+    };
+
+    if (Platform.OS === 'web') {
+      if (confirm('Bạn chắc chắn muốn xóa dịch vụ này?')) {
+        performDelete();
+      }
+    } else {
+      Alert.alert('Xác nhận', 'Bạn chắc chắn muốn xóa dịch vụ này?', [
+        { text: 'Hủy', style: 'cancel' },
+        { text: 'Xóa', style: 'destructive', onPress: performDelete }
+      ]);
+    }
   };
 
   const renderItem = ({ item }) => {

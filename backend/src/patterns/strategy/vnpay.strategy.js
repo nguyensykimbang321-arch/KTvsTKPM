@@ -72,7 +72,14 @@ class VNPayStrategy extends PaymentStrategy {
   }
 
   _formatDate(date) {
-    return date.toISOString().replace(/[-:T]/g, '').slice(0, 14);
+    const gmt7Date = new Date(date.getTime() + (7 * 60 * 60 * 1000));
+    const pad = (num) => String(num).padStart(2, '0');
+    return gmt7Date.getUTCFullYear() +
+      pad(gmt7Date.getUTCMonth() + 1) +
+      pad(gmt7Date.getUTCDate()) +
+      pad(gmt7Date.getUTCHours()) +
+      pad(gmt7Date.getUTCMinutes()) +
+      pad(gmt7Date.getUTCSeconds());
   }
 }
 

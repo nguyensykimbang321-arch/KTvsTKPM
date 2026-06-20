@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, ActivityIndicator, TouchableOpacity, Text, Alert } from 'react-native';
+import { StyleSheet, View, ActivityIndicator, TouchableOpacity, Text, Alert, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, RefreshCcw } from 'lucide-react-native';
@@ -21,12 +21,17 @@ export default function VNPayScreen({ route, navigation }) {
   }
 
   const handleNavigationStateChange = (navState) => {
-    // Kiểm tra nếu URL chứa return URL từ backend
-    if (navState.url.includes('vnpay_return')) {
-      Alert.alert('Thông báo', 'Giao dịch đang được xử lý...');
-      setTimeout(() => {
+    // Kiểm tra nếu URL chứa return URL từ backend và có mã phản hồi từ VNPAY
+    if (navState.url.includes('vnpay_return') && navState.url.includes('vnp_ResponseCode')) {
+      if (Platform.OS === 'web') {
+        alert('Giao dịch đang được xử lý...');
         navigation.navigate('MainTabs');
-      }, 2000);
+      } else {
+        Alert.alert('Thông báo', 'Giao dịch đang được xử lý...');
+        setTimeout(() => {
+          navigation.navigate('MainTabs');
+        }, 2000);
+      }
     }
   };
 
@@ -38,26 +43,44 @@ export default function VNPayScreen({ route, navigation }) {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Thanh toán VNPAY</Text>
         <TouchableOpacity onPress={() => navigation.navigate('MainTabs')} style={styles.closeBtn}>
-           <RefreshCcw color={theme.colors.text} size={20} />
+          <RefreshCcw color={theme.colors.text} size={20} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.webviewContainer}>
-        <WebView 
-          source={{ uri: paymentUrl }}
-          onLoadStart={() => setLoading(true)}
-          onLoadEnd={() => setLoading(false)}
-          onNavigationStateChange={handleNavigationStateChange}
-          javaScriptEnabled={true}
-          domStorageEnabled={true}
-          startInLoadingState={true}
-          renderLoading={() => (
-            <View style={styles.loadingOverlay}>
-              <ActivityIndicator color={theme.colors.primary} size="large" />
-              <Text style={styles.loadingText}>Đang kết nối tới VNPAY...</Text>
-            </View>
-          )}
-        />
+        {Platform.OS === 'web' ? (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+            <ActivityIndicator color={theme.colors.primary} size="large" />
+            <Text style={{ fontSize: 16, fontWeight: '700', color: theme.colors.text, marginTop: 16, textAlign: 'center' }}>
+              Tab thanh toán VNPAY đã được mở!
+            </Text>
+            <Text style={{ fontSize: 14, color: theme.colors.textSecondary, marginTop: 8, textAlign: 'center', marginBottom: 32 }}>
+              Vui lòng hoàn tất thanh toán trên tab mới mở của VNPAY. Sau khi hoàn tất, hệ thống sẽ tự động cập nhật lịch hẹn của bạn.
+            </Text>
+            <TouchableOpacity
+              style={{ backgroundColor: theme.colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}
+              onPress={() => navigation.navigate('MainTabs')}
+            >
+              <Text style={{ color: 'white', fontWeight: 'bold' }}>Quay lại trang chủ</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <WebView
+            source={{ uri: paymentUrl }}
+            onLoadStart={() => setLoading(true)}
+            onLoadEnd={() => setLoading(false)}
+            onNavigationStateChange={handleNavigationStateChange}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            startInLoadingState={true}
+            renderLoading={() => (
+              <View style={styles.loadingOverlay}>
+                <ActivityIndicator color={theme.colors.primary} size="large" />
+                <Text style={styles.loadingText}>Đang kết nối tới VNPAY...</Text>
+              </View>
+            )}
+          />
+        )}
       </View>
     </SafeAreaView>
   );
@@ -65,11 +88,11 @@ export default function VNPayScreen({ route, navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'white' },
-  header: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16, 
+    paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9'

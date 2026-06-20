@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   StyleSheet, View, Text, Image, TouchableOpacity, 
-  ScrollView, Alert, ActivityIndicator, Modal, TextInput 
+  ScrollView, Alert, ActivityIndicator, Modal, TextInput, Platform 
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { User, Settings, Shield, LogOut, ChevronRight, Clock, Save, Image as ImageIcon, Lock } from 'lucide-react-native';
@@ -72,20 +72,27 @@ export default function ProfileScreen({ navigation }) {
   };
 
   const handleLogout = async () => {
-    Alert.alert('Đăng xuất', 'Bạn có chắc chắn muốn thoát?', [
-      { text: 'Hủy', style: 'cancel' },
-      { text: 'Đăng xuất', onPress: async () => {
-          await AsyncStorage.removeItem('token');
-          await AsyncStorage.removeItem('user');
-          navigation.dispatch(
-            CommonActions.reset({
-              index: 0,
-              routes: [{ name: 'Login' }],
-            })
-          );
-        }
+    const performLogout = async () => {
+      await AsyncStorage.removeItem('token');
+      await AsyncStorage.removeItem('user');
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        })
+      );
+    };
+
+    if (Platform.OS === 'web') {
+      if (confirm('Bạn có chắc chắn muốn đăng xuất không?')) {
+        await performLogout();
       }
-    ]);
+    } else {
+      Alert.alert('Đăng xuất', 'Bạn có chắc chắn muốn thoát?', [
+        { text: 'Hủy', style: 'cancel' },
+        { text: 'Đăng xuất', onPress: performLogout }
+      ]);
+    }
   };
 
   const getMenuItems = () => {
@@ -105,7 +112,7 @@ export default function ProfileScreen({ navigation }) {
 
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}>
         <View style={styles.header}>
           <Image source={{ uri: userData?.avatar || 'https://i.pravatar.cc/150?u=customer' }} style={styles.avatar} />

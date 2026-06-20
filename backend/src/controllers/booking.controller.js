@@ -34,7 +34,7 @@ class BookingController {
     try {
       const { id } = req.params;
       const { reason } = req.body;
-      const booking = await bookingService.cancelBooking(id, req.user.id, reason);
+      const booking = await bookingService.cancelBooking(id, req.user.id, req.user.role, reason);
       res.json({ message: 'Hủy lịch hẹn thành công', data: booking });
     } catch (error) {
       next(error);
@@ -55,7 +55,7 @@ class BookingController {
     try {
       const { id } = req.params;
       const { reason } = req.body;
-      const result = await bookingService.refundBooking(id, req.user.id, reason);
+      const result = await bookingService.refundBooking(id, req.user.id, req.user.role, reason);
       res.json({ message: 'Hoàn tiền lịch hẹn thành công', data: result });
     } catch (error) {
       next(error);

@@ -13,15 +13,15 @@ export default function BottomNav({ state, descriptors, navigation }) {
 
   // Tính toán khoảng cách đáy an toàn
   const bottomGap = Platform.select({
-    ios: insets.bottom > 0 ? insets.bottom : 20,
-    android: insets.bottom > 0 ? insets.bottom + 12 : 32, // Tăng thêm trên Android để tránh đè phím điều hướng
-    default: 24
+    ios: insets.bottom > 0 ? insets.bottom : 16,
+    android: insets.bottom > 0 ? insets.bottom + 8 : 16,
+    default: 16
   });
 
   return (
     <View style={[
       styles.container, 
-      { bottom: bottomGap }
+      { marginBottom: bottomGap }
     ]}>
       <View style={styles.navBar}>
         {tabs.map((tab, index) => {
@@ -65,12 +65,10 @@ export default function BottomNav({ state, descriptors, navigation }) {
 
 const styles = StyleSheet.create({
   container: {
-    position: 'absolute',
-    left: 20,
-    right: 20,
     backgroundColor: 'white',
     borderRadius: 24,
     height: 70,
+    marginHorizontal: 20,
     ...theme.shadows.medium,
     paddingHorizontal: 10,
     elevation: 10, // Đảm bảo nổi bật trên Android

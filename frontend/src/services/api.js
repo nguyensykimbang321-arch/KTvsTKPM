@@ -1,7 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = 'http://192.168.1.171:3000/api/v1';
+const API_URL = 'http://192.168.1.163:3000/api/v1';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -73,6 +73,12 @@ export const staffService = {
 
 export const paymentService = {
   initiate: (bookingId, method, amount) => api.post('/payments/initiate', { bookingId, method, amount }),
+};
+
+export const notificationService = {
+  getNotifications: () => api.get('/notifications'),
+  markAllAsRead: () => api.patch('/notifications/read'),
+  deleteAll: () => api.delete('/notifications'),
 };
 
 export default api;

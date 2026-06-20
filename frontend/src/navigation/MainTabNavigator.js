@@ -30,6 +30,10 @@ export default function MainTabNavigator() {
 
 const styles = StyleSheet.create({
   tabBarContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     backgroundColor: 'transparent',
     elevation: 0,
     borderTopWidth: 0,

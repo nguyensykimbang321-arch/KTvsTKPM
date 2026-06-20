@@ -77,9 +77,14 @@ class BookingService extends Subject {
     return booking;
   }
 
-  async cancelBooking(bookingId, userId, reason) {
+  async cancelBooking(bookingId, userId, userRole, reason) {
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) throw new Error('Không tìm thấy lịch hẹn');
+
+    // Bảo mật: Chỉ khách hàng sở hữu lịch hẹn, nhân viên được phân công hoặc Admin mới được hủy
+    if (booking.customerId !== parseInt(userId) && booking.staffId !== parseInt(userId) && userRole !== 'admin') {
+      throw new Error('Bạn không có quyền hủy lịch hẹn này');
+    }
 
     // State Pattern: Chuyển trạng thái an toàn
     const context = new BookingContext(booking, bookingRepository);
@@ -140,11 +145,16 @@ class BookingService extends Subject {
     return booking;
   }
 
-  async refundBooking(bookingId, userId, reason) {
+  async refundBooking(bookingId, userId, userRole, reason) {
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) throw new Error('Không tìm thấy lịch hẹn');
     if (booking.status === 'completed') throw new Error('Không thể hoàn tiền khi lịch đã hoàn thành');
     if (booking.status === 'cancelled') throw new Error('Lịch hẹn đã bị hủy từ trước');
+
+    // Bảo mật: Chỉ khách hàng sở hữu lịch hẹn hoặc Admin mới được hoàn tiền
+    if (booking.customerId !== parseInt(userId) && userRole !== 'admin') {
+      throw new Error('Bạn không có quyền yêu cầu hoàn tiền cho lịch hẹn này');
+    }
 
     // Tính toán hoàn tiền dựa trên thời gian còn lại đến giờ hẹn
     const refundPercentage = this._calculateRefundPercentage(booking.bookingDate, booking.startTime);

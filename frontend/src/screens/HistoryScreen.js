@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Image, Alert } from 'react-native';
+import { StyleSheet, View, Text, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Image, Alert, Platform } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Calendar, Clock, ChevronRight, Scissors } from 'lucide-react-native';
 import { theme } from '../theme/theme';
@@ -28,26 +28,41 @@ export default function HistoryScreen({ navigation }) {
   };
 
   const handleCancelBooking = (bookingId) => {
-    Alert.alert(
-      'Hủy lịch hẹn',
-      'Vui lòng nhập lý do hủy:',
-      [
-        { text: 'Quay lại', style: 'cancel' },
-        { text: 'Tôi không có thời gian', onPress: () => cancelBooking(bookingId, 'Tôi không có thời gian') },
-        { text: 'Đổi lịch hẹn khác', onPress: () => cancelBooking(bookingId, 'Đổi lịch hẹn khác') },
-        { text: 'Lý do khác', onPress: () => cancelBooking(bookingId, 'Lý do khác') }
-      ],
-      { cancelable: true }
-    );
+    if (Platform.OS === 'web') {
+      const reason = prompt('Vui lòng nhập lý do hủy lịch hẹn (Ví dụ: Tôi không có thời gian, Đổi lịch hẹn khác...):', 'Tôi không có thời gian');
+      if (reason !== null) {
+        cancelBooking(bookingId, reason || 'Tôi không có thời gian');
+      }
+    } else {
+      Alert.alert(
+        'Hủy lịch hẹn',
+        'Vui lòng nhập lý do hủy:',
+        [
+          { text: 'Quay lại', style: 'cancel' },
+          { text: 'Tôi không có thời gian', onPress: () => cancelBooking(bookingId, 'Tôi không có thời gian') },
+          { text: 'Đổi lịch hẹn khác', onPress: () => cancelBooking(bookingId, 'Đổi lịch hẹn khác') },
+          { text: 'Lý do khác', onPress: () => cancelBooking(bookingId, 'Lý do khác') }
+        ],
+        { cancelable: true }
+      );
+    }
   };
 
   const cancelBooking = async (bookingId, reason) => {
     try {
       await bookingService.refund(bookingId, reason);
-      Alert.alert('Thành công', 'Lịch hẹn đã được hủy và hoàn tiền');
+      if (Platform.OS === 'web') {
+        alert('Lịch hẹn đã được hủy và hoàn tiền thành công');
+      } else {
+        Alert.alert('Thành công', 'Lịch hẹn đã được hủy và hoàn tiền');
+      }
       fetchBookings(); // Reload danh sách
     } catch (error) {
-      Alert.alert('Lỗi', typeof error === 'string' ? error : 'Không thể hủy lịch hẹn');
+      if (Platform.OS === 'web') {
+        alert(typeof error === 'string' ? error : 'Không thể hủy lịch hẹn');
+      } else {
+        Alert.alert('Lỗi', typeof error === 'string' ? error : 'Không thể hủy lịch hẹn');
+      }
       console.error(error);
     }
   };
@@ -121,7 +136,7 @@ export default function HistoryScreen({ navigation }) {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Lịch hẹn của tôi</Text>
       </View>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { 
-  StyleSheet, View, Text, TouchableOpacity, 
-  ScrollView, Image, Platform, Alert, ActivityIndicator 
+import {
+  StyleSheet, View, Text, TouchableOpacity,
+  ScrollView, Image, Platform, Alert, ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -27,7 +27,7 @@ export default function PaymentScreen({ route, navigation }) {
   const handlePayment = async () => {
     try {
       setLoading(true);
-      
+
       // 1. Tạo Booking thực tế trong Database
       const bookingPayload = {
         serviceId: service.id,
@@ -39,22 +39,36 @@ export default function PaymentScreen({ route, navigation }) {
       };
 
       const newBooking = await bookingService.create(bookingPayload);
-      
+
       if (method === 'vnpay') {
         // 2. Nếu chọn VNPAY, khởi tạo thanh toán với ID thật
         const response = await paymentService.initiate(newBooking.id, 'vnpay');
-        navigation.navigate('VNPay', { paymentUrl: response.paymentUrl });
+        if (Platform.OS === 'web') {
+          window.open(response.paymentUrl, '_blank');
+          navigation.navigate('VNPay', { paymentUrl: response.paymentUrl });
+        } else {
+          navigation.navigate('VNPay', { paymentUrl: response.paymentUrl });
+        }
       } else {
         // 3. Nếu chọn trả sau (COD)
-        Alert.alert(
-          'Thành công 🎉', 
-          'Lịch đặt của bạn đã được ghi nhận (Trả sau). Bạn có thể xem lại trong Lịch sử.',
-          [{ text: 'Về trang chủ', onPress: () => navigation.navigate('MainTabs') }]
-        );
+        if (Platform.OS === 'web') {
+          window.alert('Lịch đặt của bạn đã được ghi nhận (Thanh toán tại quầy). Bạn có thể xem lại trong Lịch sử.');
+          navigation.navigate('MainTabs');
+        } else {
+          Alert.alert(
+            'Thành công 🎉',
+            'Lịch đặt của bạn đã được ghi nhận (Thanh toán tại quầy). Bạn có thể xem lại trong Lịch sử.',
+            [{ text: 'Về trang chủ', onPress: () => navigation.navigate('MainTabs') }]
+          );
+        }
       }
     } catch (error) {
       console.error(error);
-      Alert.alert('Lỗi', typeof error === 'string' ? error : 'Có lỗi xảy ra khi xử lý đơn hàng.');
+      if (Platform.OS === 'web') {
+        window.alert(typeof error === 'string' ? error : 'Có lỗi xảy ra khi xử lý đơn hàng.');
+      } else {
+        Alert.alert('Lỗi', typeof error === 'string' ? error : 'Có lỗi xảy ra khi xử lý đơn hàng.');
+      }
     } finally {
       setLoading(false);
     }
@@ -76,8 +90,6 @@ export default function PaymentScreen({ route, navigation }) {
           <View style={styles.stepActive}><CheckCircle2 color="white" size={14} /></View>
           <View style={styles.stepLineActive} />
           <View style={styles.stepActive}><Text style={styles.stepNum}>2</Text></View>
-          <View style={styles.stepLine} />
-          <View style={styles.stepInactive}><Text style={styles.stepNumInactive}>3</Text></View>
         </View>
 
         {/* Invoice Card */}
@@ -86,7 +98,7 @@ export default function PaymentScreen({ route, navigation }) {
             <Text style={styles.invoiceTitle}>Chi tiết hóa đơn</Text>
             <ShieldCheck color={theme.colors.success} size={20} />
           </View>
-          
+
           <View style={styles.invoiceItem}>
             <Text style={styles.label}>Dịch vụ</Text>
             <Text style={styles.value}>{service.name}</Text>
@@ -95,9 +107,9 @@ export default function PaymentScreen({ route, navigation }) {
             <Text style={styles.label}>Thời gian</Text>
             <Text style={styles.value}>{slot}, {date}</Text>
           </View>
-          
+
           <View style={styles.dash} />
-          
+
           <View style={styles.invoiceItem}>
             <Text style={styles.totalLabel}>Tổng cộng</Text>
             <Text style={styles.totalValue}>{parseInt(service.price).toLocaleString()}đ</Text>
@@ -106,9 +118,9 @@ export default function PaymentScreen({ route, navigation }) {
 
         {/* Methods */}
         <Text style={styles.sectionTitle}>Chọn phương thức trả phí</Text>
-        
-        <TouchableOpacity 
-          style={[styles.method, method === 'vnpay' && styles.methodActive]} 
+
+        <TouchableOpacity
+          style={[styles.method, method === 'vnpay' && styles.methodActive]}
           onPress={() => setMethod('vnpay')}
         >
           <View style={[styles.iconBox, { backgroundColor: '#EEF2FF' }]}>
@@ -123,7 +135,7 @@ export default function PaymentScreen({ route, navigation }) {
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.method, method === 'cod' && styles.methodActive]}
           onPress={() => setMethod('cod')}
         >
@@ -147,8 +159,8 @@ export default function PaymentScreen({ route, navigation }) {
       </ScrollView>
 
       <View style={styles.footer}>
-        <PremiumButton 
-          title="Xác nhận & Hoàn tất" 
+        <PremiumButton
+          title="Xác nhận & Hoàn tất"
           onPress={handlePayment}
           loading={loading}
           style={{ height: 60 }}
@@ -163,7 +175,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10 },
   backBtn: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' },
   title: { fontSize: 18, fontWeight: '800', color: theme.colors.text },
-  
+
   steps: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 40 },
   stepActive: { width: 28, height: 28, borderRadius: 14, backgroundColor: theme.colors.primary, justifyContent: 'center', alignItems: 'center' },
   stepInactive: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' },
@@ -171,7 +183,7 @@ const styles = StyleSheet.create({
   stepNumInactive: { color: theme.colors.textMuted, fontSize: 12, fontWeight: '800' },
   stepLineActive: { flex: 0.2, height: 2, backgroundColor: theme.colors.primary },
   stepLine: { flex: 0.2, height: 2, backgroundColor: '#F1F5F9' },
-  
+
   invoice: { backgroundColor: '#F8FAFC', borderRadius: 32, padding: 24, marginBottom: 40 },
   invoiceHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   invoiceTitle: { fontSize: 18, fontWeight: '800', color: theme.colors.text },
